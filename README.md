@@ -1,163 +1,281 @@
-# 💄 GlamAI
+# 💄 GlamAI Backend — Practical Implementation Guide
 
-**AI-Powered Makeup Recommendation & Virtual Try-On App**
+## 🧱 1. Backend Responsibilities 
 
-GlamAI is a mobile application that combines **AI**, **facial recognition**, and **Augmented Reality (AR)** to deliver hyper-personalized makeup recommendations and real-time virtual try-on experiences. Built with **React Native** and a **serverless AWS architecture**, GlamAI allows users to upload a selfie, receive AI-curated makeup suggestions, and instantly try them on using AR.
+Your backend should do **only 5 core jobs**:
 
----
+1. **Accept selfie uploads securely**
+2. **Analyze face data (Rekognition)**
+3. **Generate AI makeup recommendations (OpenAI)**
+4. **Store & retrieve user look data (DynamoDB)**
+5. **Return AR-ready presets + product links**
 
-## 🧠 Overview
-
-**Flow:**
-Selfie Upload → Facial Analysis (AWS Rekognition) → AI Recommendations (OpenAI) → AR Virtual Try-On → Save or Buy
-
-GlamAI analyzes facial features and skin tone to recommend suitable makeup products and enables users to preview these looks live using AR technology.
-
----
-
-## 🎯 Business Goals
-
-* Deliver **personalized, AI-driven makeup recommendations**
-* Enable **real-time AR try-on** to improve user confidence
-* Connect recommendations directly to **purchase options**
-* Build a **scalable, serverless architecture** using AWS CDK
+Everything else (AR rendering, UI, camera) stays **frontend-only**.
 
 ---
 
-## 👩‍💻 Target Users
+## 🧩 2. Backend API Design (REST)
 
-* **Beauty Enthusiasts** – Explore personalized looks with AR
-* **Beginners** – Get AI guidance on shades and styles
-* **Makeup Artists** – Preview and share looks with clients
-* **Online Shoppers** – Try before buying, directly in-app
+### Base URL
 
----
+```
+https://api.glamai.app
+```
 
-## ⚙️ Core Features
+### Endpoints
 
-* 📸 **Selfie Upload** (Camera or Gallery)
-* 🧑‍🦰 **Facial Analysis** using AWS Rekognition
-* 🤖 **AI Makeup Recommendations** via OpenAI
-* 💄 **AR Virtual Try-On** (Real-time overlays)
-* 🎨 **Look Filters** (Natural, Glam, Bold)
-* 🛍️ **Product Links** for direct purchase
-* ❤️ **Saved Looks & User Profiles**
-
----
-
-## 🧱 System Architecture
-
-### 📱 Frontend (React Native)
-
-* React Native (iOS & Android)
-* AR SDK: Banuba / ModiFace / Snap AR
-* Camera: Expo Camera / Vision Camera
-* Styling: Tailwind RN / React Native Paper
-* Navigation: Expo Router
-
-### ☁️ Backend (AWS Serverless via CDK)
-
-* **AWS Lambda** – Core business logic
-* **AWS Rekognition** – Facial analysis
-* **OpenAI API** – AI-powered recommendations
-* **Amazon DynamoDB** – User & look data
-* **Amazon S3** – Selfie & AR asset storage
-* **API Gateway** – Secure REST APIs
-* **CloudWatch** – Monitoring & logging
+| Method | Endpoint           | Purpose                  |
+| ------ | ------------------ | ------------------------ |
+| POST   | `/upload-url`      | Get pre-signed S3 URL    |
+| POST   | `/analyze`         | Run Rekognition + OpenAI |
+| GET    | `/looks/{userId}`  | Get saved looks          |
+| POST   | `/looks/save`      | Save a look              |
+| GET    | `/look/{uploadId}` | Fetch one look           |
 
 ---
 
-## 🧬 DynamoDB Data Model (UserFaces)
+## ☁️ 3. AWS Resources (CDK Stack)
 
-| Attribute       | Type   | Description        |
-| --------------- | ------ | ------------------ |
-| userId          | PK     | Unique user ID     |
-| uploadId        | SK     | Selfie session ID  |
-| skinTone        | String | Detected skin tone |
-| facialFeatures  | Map    | Rekognition data   |
-| recommendedLook | Map    | AI-generated look  |
-| arPresetId      | String | Linked AR preset   |
-| productLinks    | List   | Purchase URLs      |
-| createdAt       | String | Timestamp          |
+### Core Services
+
+```
+S3 (selfies)
+Lambda (API handlers)
+API Gateway (REST)
+Rekognition
+DynamoDB (UserFaces)
+Secrets Manager (OpenAI key)
+CloudWatch
+```
 
 ---
 
-## 💋 AR Virtual Try-On
+## 📁 4. Project Structure (Recommended)
 
-* Uses **ARKit (iOS)** / **ARCore (Android)**
-* Live facial tracking with digital makeup overlays
-* Users can switch looks, capture photos, and share
+```
+glamai-backend/
+├── cdk/
+│   └── glamai-stack.ts
+├── lambdas/
+│   ├── upload-url.ts
+│   ├── analyze-face.ts
+│   ├── get-looks.ts
+│   ├── save-look.ts
+│   └── utils/
+│       ├── rekognition.ts
+│       ├── openai.ts
+│       └── dynamodb.ts
+├── package.json
+└── tsconfig.json
+```
 
-```js
-import { ARView } from 'banuba-react-native-sdk';
+---
 
-export default function TryOnScreen({ route }) {
-  const { recommendedLook } = route.params;
-  return <ARView preset={recommendedLook.arPresetId} style={{ flex: 1 }} />;
+## 🧠 5. Data Model (DynamoDB)
+
+### Table: `UserFaces`
+
+**PK:** `userId`
+**SK:** `uploadId`
+
+```ts
+{
+  userId: "user-123",
+  uploadId: "upload-456",
+  skinTone: "medium-warm",
+  faceShape: "oval",
+  facialFeatures: {
+    lips: "full",
+    eyes: "almond"
+  },
+  recommendedLook: {
+    name: "Soft Glam",
+    products: [...]
+  },
+  arPresetId: "soft_glam_v1",
+  productLinks: [...],
+  createdAt: "2025-01-01T10:00:00Z"
 }
 ```
 
 ---
 
-## 🧭 User Flow
+## 📸 6. Selfie Upload (Secure S3)
 
-1. Onboard / Sign In
-2. Upload Selfie
-3. AI Analysis (Rekognition + OpenAI)
-4. View Recommended Looks & Products
-5. AR Try-On
-6. Save, Share, or Buy
+### Lambda: `upload-url.ts`
 
----
+```ts
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-## 🔐 Security & Privacy
+const s3 = new S3Client({});
 
-* Private S3 buckets for image storage
-* Facial data anonymized (only derived metrics stored)
-* HTTPS enforced via API Gateway
-* Optional authentication with AWS Cognito
-* GDPR / CCPA compliant design
+export const handler = async () => {
+  const uploadId = crypto.randomUUID();
+  const command = new PutObjectCommand({
+    Bucket: process.env.BUCKET!,
+    Key: `selfies/${uploadId}.jpg`,
+    ContentType: "image/jpeg",
+  });
 
----
+  const url = await getSignedUrl(s3, command, { expiresIn: 60 });
 
-## 🧰 Tech Stack Summary
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ uploadId, url }),
+  };
+};
+```
 
-**Frontend:** React Native, Expo, Tailwind RN, AR SDK
-**Backend:** AWS Lambda, Rekognition, DynamoDB, API Gateway
-**Infrastructure:** AWS CDK
-**AI:** OpenAI API
-**Storage:** Amazon S3
-**Monitoring:** CloudWatch
-
----
-
-## 🗓️ Development Roadmap
-
-* Phase 1: AWS CDK Infrastructure
-* Phase 2: React Native App & API Integration
-* Phase 3: AI Pipeline (Rekognition + OpenAI)
-* Phase 4: AR Virtual Try-On
-* Phase 5: Product & E-commerce Integration
-* Phase 6: Optimization & Release
+Frontend uploads **directly to S3** — no backend image handling 🔒
 
 ---
 
-## 💡 Future Enhancements
+## 👁️ 7. Facial Analysis (AWS Rekognition)
 
-* Multi-face try-on
-* AI “Look of the Day”
-* Skincare recommendations
-* Third-party e-commerce integrations
+### `utils/rekognition.ts`
+
+```ts
+import { RekognitionClient, DetectFacesCommand } from "@aws-sdk/client-rekognition";
+
+const rekognition = new RekognitionClient({});
+
+export async function analyzeFace(bucket: string, key: string) {
+  const command = new DetectFacesCommand({
+    Image: { S3Object: { Bucket: bucket, Name: key } },
+    Attributes: ["ALL"],
+  });
+
+  const { FaceDetails } = await rekognition.send(command);
+  const face = FaceDetails?.[0];
+
+  return {
+    skinTone: face?.Confidence! > 90 ? "medium-warm" : "unknown",
+    faceShape: "oval", // derived logic
+    landmarks: face?.Landmarks,
+  };
+}
+```
+
+👉 **Store derived data only**, never raw biometric data.
 
 ---
 
-## 🎨 Inspiration
+## 🤖 8. AI Recommendations (OpenAI)
 
-* Dior AR Makeup Experience
-* Banuba Makeup AR Platform
+### `utils/openai.ts`
+
+```ts
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_KEY!,
+});
+
+export async function generateLook(faceData: any) {
+  const prompt = `
+User facial profile:
+Skin tone: ${faceData.skinTone}
+Face shape: ${faceData.faceShape}
+
+Generate:
+- Look name
+- Foundation shade
+- Lipstick shade
+- Eyeshadow colors
+- AR preset ID
+- Reasoning
+`;
+
+  const res = await openai.chat.completions.create({
+    model: "gpt-4.1-mini",
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  return JSON.parse(res.choices[0].message.content!);
+}
+```
 
 ---
 
-## ✅ Summary
+## 🔁 9. Main AI Pipeline Lambda
 
-**GlamAI** delivers an intelligent, immersive beauty experience by combining **AI recommendations**, **AR virtual try-on**, and a **scalable AWS serverless backend**—all in one modern mobile app.
+### `analyze-face.ts`
+
+```ts
+import { analyzeFace } from "./utils/rekognition";
+import { generateLook } from "./utils/openai";
+import { saveLook } from "./utils/dynamodb";
+
+export const handler = async (event) => {
+  const { userId, uploadId } = JSON.parse(event.body);
+
+  const faceData = await analyzeFace(
+    process.env.BUCKET!,
+    `selfies/${uploadId}.jpg`
+  );
+
+  const look = await generateLook(faceData);
+
+  await saveLook({
+    userId,
+    uploadId,
+    ...faceData,
+    recommendedLook: look,
+    arPresetId: look.arPresetId,
+    createdAt: new Date().toISOString(),
+  });
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify(look),
+  };
+};
+```
+
+---
+
+## 🪞 10. AR Integration (Backend’s Role)
+
+Backend **only returns**:
+
+```json
+{
+  "lookName": "Soft Glam",
+  "arPresetId": "soft_glam_v1",
+  "products": [...]
+}
+```
+
+Frontend maps `arPresetId` → Banuba / ModiFace preset.
+
+✔ No AR logic on backend
+✔ Keeps system scalable
+
+---
+
+## 🔐 11. Security Best Practices
+
+* ✅ S3 bucket **private**
+* ✅ Pre-signed URLs only
+* ✅ Cognito (optional) for auth
+* ✅ OpenAI key in **Secrets Manager**
+* ✅ No raw face images in DB
+* ✅ TLS enforced via API Gateway
+
+---
+
+## 📦 12. CDK Stack (Minimal Example)
+
+```ts
+new lambda.Function(this, "AnalyzeFace", {
+  runtime: lambda.Runtime.NODEJS_20_X,
+  handler: "analyze-face.handler",
+  code: lambda.Code.fromAsset("lambdas"),
+  environment: {
+    BUCKET: bucket.bucketName,
+    OPENAI_KEY: secret.secretValue.toString(),
+  },
+});
+```
+
