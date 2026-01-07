@@ -278,4 +278,6 @@ new lambda.Function(this, "AnalyzeFace", {
   },
 });
 ```
+## 13. Architecture Overview
+![My Screenshot](glamai_arch.png)
 
