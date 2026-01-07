@@ -1,29 +1,40 @@
-# 💄 GlamAI Backend — Practical Implementation Guide
+# 💄 GlamAI 
+**AI-Powered Makeup Recommendation & Virtual Try-On App**
 
-## 🧱 1. Backend Responsibilities 
+GlamAI is a mobile application that combines **AI**, **facial recognition**, and **Augmented Reality (AR)** to deliver hyper-personalized makeup recommendations and real-time virtual try-on experiences. Built with **React Native** and a **serverless AWS architecture**, GlamAI allows users to upload a selfie, receive AI-curated makeup suggestions, and instantly try them on using AR
 
-Your backend should do **only 5 core jobs**:
+---
 
+## 🧠 Overview
+
+**Flow:**
+Selfie Upload → Facial Analysis (AWS Rekognition) → AI Recommendations (OpenAI) → AR Virtual Try-On → Save or Buy
+
+GlamAI analyzes facial features and skin tone to recommend suitable makeup products and enables users to preview these looks live using AR technology.
+
+---
+
+## 🎯 Business Goals
 1. **Accept selfie uploads securely**
 2. **Analyze face data (Rekognition)**
 3. **Generate AI makeup recommendations (OpenAI)**
 4. **Store & retrieve user look data (DynamoDB)**
 5. **Return AR-ready presets + product links**
 
-Everything else (AR rendering, UI, camera) stays **frontend-only**.
-
 ---
 
-## 🧩 2. Backend API Design (REST)
-
+## 👩‍💻 Target Users
+* **Beauty Enthusiasts** – Explore personalized looks with AR
+* **Beginners** – Get AI guidance on shades and styles
+* **Makeup Artists** – Preview and share looks with clients
+* **Online Shoppers** – Try before buying, directly in-app
 ### Base URL
 
+---
 ```
 https://api.glamai.app
 ```
-
 ### Endpoints
-
 | Method | Endpoint           | Purpose                  |
 | ------ | ------------------ | ------------------------ |
 | POST   | `/upload-url`      | Get pre-signed S3 URL    |
@@ -34,86 +45,36 @@ https://api.glamai.app
 
 ---
 
-## ☁️ 3. AWS Resources (CDK Stack)
+## 🧱 System Architecture
 
-### Core Services
+### 📱 Frontend (React Native)
 
-```
-S3 (selfies)
-Lambda (API handlers)
-API Gateway (REST)
-Rekognition
-DynamoDB (UserFaces)
-Secrets Manager (OpenAI key)
-CloudWatch
-```
+* React Native (iOS & Android)
+* AR SDK: Banuba / ModiFace / Snap AR
+* Camera: Expo Camera / Vision Camera
+* Styling: Tailwind RN / React Native Paper
+* Navigation: Expo Router
 
----
+### ☁️ Backend (AWS Serverless via CDK)
 
-## 📁 4. Project Structure (Recommended)
+* **AWS Lambda** – Core business logic
+* **AWS Rekognition** – Facial analysis
+* **OpenAI API** – AI-powered recommendations
+* **Amazon DynamoDB** – User & look data
+* **Amazon S3** – Selfie & AR asset storage
+* **API Gateway** – Secure REST APIs
+* **CloudWatch** – Monitoring & logging
 
-```
-glamai-backend/
-├── cdk/
-│   └── glamai-stack.ts
-├── lambdas/
-│   ├── upload-url.ts
-│   ├── analyze-face.ts
-│   ├── get-looks.ts
-│   ├── save-look.ts
-│   └── utils/
-│       ├── rekognition.ts
-│       ├── openai.ts
-│       └── dynamodb.ts
-├── package.json
-└── tsconfig.json
-```
-## 5. Architecture Overview
-![My Screenshot](glamai_arch.png)
+## 🧬 DynamoDB Data Model (UserFaces)
 
-## 6. Components
-
-# User / Frontend AR SDK
-
-Logs in → gets JWT from Cognito.
-
-Requests recommendations → fetches AR overlays for try-on.
-
-# Authentication (Cognito)
-
-Provides JWT tokens for secure API access.
-
-# API Layer (API Gateway + Lambda)
-
-Endpoint 1: /get-presigned-url → Lambda generates pre-signed S3 URL for selfie upload.
-
-Endpoint 2: /get-recommendation → Lambda fetches recommendation metadata from DynamoDB.
-
-# Selfie Bucket (S3)
-
-Users upload selfies here via pre-signed URL.
-
-S3 Event → Lambda triggers:
-
-Analyze face with Rekognition
-
-Call OpenAI → generate makeup recommendation
-
-Store metadata in DynamoDB
-
-# AR Assets Bucket (S3)
-
-Stores pre-made AR overlay templates (lipstick, eyeshadow, blush).
-
-Frontend fetches templates via pre-signed URLs (or CloudFront).
-
-# DynamoDB
-
-Stores recommendation metadata (colors, products, template references).
-
-# Monitoring (CloudWatch + X-Ray)
-
-Logs API and Lambda execution.
-
-Traces full request flow for debugging.
+| Attribute       | Type   | Description        |
+| --------------- | ------ | ------------------ |
+| userId          | PK     | Unique user ID     |
+| uploadId        | SK     | Selfie session ID  |
+| skinTone        | String | Detected skin tone |
+| facialFeatures  | Map    | Rekognition data   |
+| recommendedLook | Map    | AI-generated look  |
+| arPresetId      | String | Linked AR preset   |
+| productLinks    | List   | Purchase URLs      |
+| createdAt       | String | Timestamp          |
 

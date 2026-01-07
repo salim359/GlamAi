@@ -1,1 +1,3 @@
 hi from the frontend
+use this component library or something you like
+https://gluestack.io/ui/docs/home/overview/quick-start

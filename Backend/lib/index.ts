@@ -1,7 +1,6 @@
 import * as cdk from "aws-cdk-lib";
 import { CognitoStack } from "./cognito";
 import S3Stack from "./s3";
-import { DynamoDBStack } from "./db";
 
 interface AppConfig {
     app: cdk.App;
