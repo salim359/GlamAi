@@ -1,21 +1,24 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import crypto from "crypto";
+import { analyzeFace } from "./utils/rekognition";
+import { generateLook } from "./utils/openai";
+import { saveLook } from "./utils/dynamodb";
 
-const s3 = new S3Client({});
+export const handler = async (event: any) => {
+  const { userId, uploadId } = JSON.parse(event.body);
 
-export const handler = async () => {
-  const uploadId = crypto.randomUUID();
-  const command = new PutObjectCommand({
-    Bucket: process.env.BUCKET!,
-    Key: `selfies/${uploadId}.jpg`,
-    ContentType: "image/jpeg",
+  const faceData = await analyzeFace(process.env.BUCKET!, `selfies/${uploadId}.jpg`);
+  const look = await generateLook(faceData);
+
+  await saveLook({
+    userId,
+    uploadId,
+    ...faceData,
+    recommendedLook: look,
+    arPresetId: look.arPresetId,
+    createdAt: new Date().toISOString(),
   });
-
-  const url = await getSignedUrl(s3, command, { expiresIn: 60 });
 
   return {
     statusCode: 200,
-    body: JSON.stringify({ uploadId, url }),
+    body: JSON.stringify(look),
   };
 };
