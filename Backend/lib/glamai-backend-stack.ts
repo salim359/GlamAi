@@ -7,7 +7,6 @@ export class GlamAIStack extends cdk.Stack {
   public readonly userPoolClient: cognito.UserPoolClient;
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-
     //userpool
     this.userPool = new cognito.UserPool(this, "GlamAIUserPool", {
       userPoolName: "GlamAIUserPool",
@@ -40,5 +39,15 @@ export class GlamAIStack extends cdk.Stack {
         userSrp: true, // a secure way to authenticate users without sending their password over the network
       },
     });
+    
+    //identitty pool
+    const identittyPool = new cognito.CfnIdentityPool(this, "GlamAIIdentityPool", {
+      allowUnauthenticatedIdentities: false,
+      cognitoIdentityProviders: [{
+        clientId: this.userPoolClient.userPoolClientId,
+        providerName: this.userPool.userPoolProviderName,
+      }],
+    });
+
   }
 }
