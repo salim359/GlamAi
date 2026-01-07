@@ -281,3 +281,49 @@ new lambda.Function(this, "AnalyzeFace", {
 ## 13. Architecture Overview
 ![My Screenshot](glamai_arch.png)
 
+## 14. Components
+
+# User / Frontend AR SDK
+
+Logs in → gets JWT from Cognito.
+
+Requests recommendations → fetches AR overlays for try-on.
+
+# Authentication (Cognito)
+
+Provides JWT tokens for secure API access.
+
+# API Layer (API Gateway + Lambda)
+
+Endpoint 1: /get-presigned-url → Lambda generates pre-signed S3 URL for selfie upload.
+
+Endpoint 2: /get-recommendation → Lambda fetches recommendation metadata from DynamoDB.
+
+# Selfie Bucket (S3)
+
+Users upload selfies here via pre-signed URL.
+
+S3 Event → Lambda triggers:
+
+Analyze face with Rekognition
+
+Call OpenAI → generate makeup recommendation
+
+Store metadata in DynamoDB
+
+# AR Assets Bucket (S3)
+
+Stores pre-made AR overlay templates (lipstick, eyeshadow, blush).
+
+Frontend fetches templates via pre-signed URLs (or CloudFront).
+
+# DynamoDB
+
+Stores recommendation metadata (colors, products, template references).
+
+# Monitoring (CloudWatch + X-Ray)
+
+Logs API and Lambda execution.
+
+Traces full request flow for debugging.
+
