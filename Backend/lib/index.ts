@@ -8,6 +8,7 @@ interface AppConfig {
 
 export default function main(app: cdk.App): void {
     new CognitoStack(app, "cognito");
-
     new S3Stack(app, "s3");
+    new DynamoDBStack(app, "dynamodb");
+
 }
