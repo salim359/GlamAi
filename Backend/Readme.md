@@ -69,7 +69,7 @@ glamai-backend/
 └── tsconfig.json
 ```
 ## 5. Architecture Overview
-![My Screenshot](glamai_arch.png)
+![My Screenshot](./glamai_arch.png)
 
 ## 6. Components
 
